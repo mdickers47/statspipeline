@@ -19,8 +19,8 @@ _DB_ARGS={
 }
 
 
-class MagicDict(object):
-  """Pretends to be a dictionary cursor, takes less memory.  Magic!"""
+class VirtualTable(object):
+  """Store column names and row data; produce dictionaries on demand."""
   def __init__(self, fields, rows):
     """Constructor
     
@@ -187,7 +187,7 @@ class PipelineBlock(pyinotify.ProcessEvent):
         self.Log('So long')
         break
 
-  def NewData(self, _):
+  def NewData(self, data):
     """Perform operation for this block
 
     Args:
@@ -195,10 +195,10 @@ class PipelineBlock(pyinotify.ProcessEvent):
     Returns:
       Output to pass to writefile
     """
-    raise NotImplemented('Please implement NewData')
+    return data
 
   def ParseFile(self, handle, name):
-    """Unpickle, turn into magic dict
+    """Unpickle, turn into virtual table
 
     Args:
       handle: File handle
@@ -227,7 +227,7 @@ class PipelineBlock(pyinotify.ProcessEvent):
     Args:
       query: SQL string
     Returns:
-      Full query result in magic dict
+      Full query result in virtual table
     """
     if not self._dbh:
       self._dbh = MySQLdb.Connect(**_DB_ARGS)
@@ -237,7 +237,7 @@ class PipelineBlock(pyinotify.ProcessEvent):
     if not result:
       return result
     fields = [i[0] for i in self._cursor.description]
-    return MagicDict(fields, result)
+    return VirtualTable(fields, result)
 
 
 def main(block_class, *args, **kwargs):
