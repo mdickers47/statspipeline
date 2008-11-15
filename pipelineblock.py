@@ -4,11 +4,10 @@ import cPickle
 import gc
 import MySQLdb
 import os
+import pyinotify
 import signal
 import sys
 import time
-
-from pyinotify import pyinotify
 
 
 _DB_ARGS={
