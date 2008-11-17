@@ -10,12 +10,18 @@ import sys
 import time
 
 
-_DB_ARGS={
-  'host':   'wells',
-  'user':   'flamingcow',
-  'passwd': '',
-  'db':     'edaystats'
-}
+import flags
+
+FLAGS = flags.FLAGS
+
+
+flags.DefineString('db-hostname', None, 'Database hostname to connect to', required=True)
+flags.DefineString('db-username', None, 'Database username to connect with', required=True)
+flags.DefineString('db-password', None, 'Database password to connect with', required=True)
+flags.DefineString('db-name', None, 'Database name to use')
+
+flags.DefineString('instance', None, 'Instance name for this instantiation of this block', required=True)
+flags.DefineString('basedir', None, 'Base directory for input/output chunks', required=True)
 
 
 class VirtualTable(object):
@@ -146,10 +152,6 @@ class PipelineBlock(pyinotify.ProcessEvent):
 
     rps = rows_in / elapsed_time
     self.Log('%s: %ld -> %ld rows in %.2fs (%ld rps)' % (name, rows_in, rows_out, elapsed_time, rps))
-    self.DBExecute('BEGIN')
-    self.DBExecute("INSERT INTO PipelineEvents (class, instance, filename, rows_in, rows_out, elapsed_ms) VALUES ('%s', '%s', '%s', %d, %d, %d)" %
-                   (self.__class__.__name__, self._instance, name, rows_in, rows_out, int(elapsed_time * 1000.0)))
-    self.DBExecute('COMMIT')
     self.DBDisconnect()
     gc.collect()
 
@@ -217,8 +219,9 @@ class PipelineBlock(pyinotify.ProcessEvent):
     cPickle.dump(data, handle, cPickle.HIGHEST_PROTOCOL)
 
   def DBDisconnect(self):
-    self._dbh.close()
-    self._dbh = None
+    if self._dbh:
+      self._dbh.close()
+      self._dbh = None
 
   def DBExecute(self, query):
     """Execute a query on the database, creating a connection if necessary
@@ -240,11 +243,7 @@ class PipelineBlock(pyinotify.ProcessEvent):
 
 
 def main(block_class, *args, **kwargs):
-  if len(sys.argv) < 3:
-    print 'Usage: %s <instance> <basedir>' % sys.argv[0]
-    sys.exit(1)
+  flags.ParseFlags()
 
-  instance = sys.argv[1]
-  basedir = sys.argv[2]
-  block = block_class(basedir, instance, *args, **kwargs)
+  block = block_class(FLAGS['basedir'], FLAGS['instance'], *args, **kwargs)
   block.Run()
