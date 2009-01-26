@@ -9,15 +9,18 @@ import signal
 import sys
 import time
 
+from pyPgSQL import PgSQL
+
 
 import flags
 
 FLAGS = flags.FLAGS
 
 
-flags.DefineString('db-hostname', None, 'Database hostname to connect to', required=True)
-flags.DefineString('db-username', None, 'Database username to connect with', required=True)
-flags.DefineString('db-password', None, 'Database password to connect with', required=True)
+flags.DefineString('db-type', 'mysql', 'Database type (mysql, pgsql)')
+flags.DefineString('db-hostname', 'localhost', 'Database hostname to connect to')
+flags.DefineString('db-username', os.getenv('USER'), 'Database username to connect with')
+flags.DefineString('db-password', None, 'Database password to connect with')
 flags.DefineString('db-name', None, 'Database name to use')
 
 flags.DefineString('instance', None, 'Instance name for this instantiation of this block', required=True)
@@ -105,6 +108,8 @@ class PipelineBlock(pyinotify.ProcessEvent):
     return time.time() - self._start_time
 
   def Log(self, msg, unused_priority=0):
+    self.DBExecute("INSERT INTO Log (class, instance, event) VALUES (%s, %s, %s)",
+                   self.__class__.__name__, self._instance, msg)
     print '%s/%s: %s' % (self.__class__.__name__, self._instance, msg)
 
   def WriteData(self, name, data):
@@ -223,7 +228,7 @@ class PipelineBlock(pyinotify.ProcessEvent):
       self._dbh.close()
       self._dbh = None
 
-  def DBExecute(self, query):
+  def DBExecute(self, query, *args):
     """Execute a query on the database, creating a connection if necessary
 
     Args:
@@ -232,10 +237,32 @@ class PipelineBlock(pyinotify.ProcessEvent):
       Full query result in virtual table
     """
     if not self._dbh:
-      self._dbh = MySQLdb.Connect(**_DB_ARGS)
+      db_args = {
+        'host': FLAGS['db-hostname'],
+        'user': FLAGS['db-username'],
+        'password': FLAGS['db-password'],
+        'db': FLAGS['db-name'],
+      }
+      if FLAGS['db-type'] == 'mysql':
+        self._dbh = MySQLdb.connect(host=FLAGS['db-hostname'],
+                                    user=FLAGS['db-username'],
+                                    passwd=FLAGS['db-password'],
+                                    db=FLAGS['db-name'])
+      elif FLAGS['db-type'] == 'pgsql':
+        self._dbh = PgSQL.connect(host=FLAGS['db-hostname'],
+                                  user=FLAGS['db-username'],
+                                  password=FLAGS['db-password'],
+                                  database=FLAGS['db-name'])
+      else:
+        print 'Invalid db-type: %s' % FLAGS['db-type']
+        sys.exit(1)
       self._cursor = self._dbh.cursor()
-    self._cursor.execute(query)
-    result = self._cursor.fetchall()
+    self._cursor.execute(query, args)
+    self._dbh.commit()
+    try:
+      result = self._cursor.fetchall()
+    except:
+      return None
     if not result:
       return result
     fields = [i[0] for i in self._cursor.description]
