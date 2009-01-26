@@ -1,0 +1,1 @@
+--indent-string='  ' --max-line-length=100000 --function-rgx='[A-Z_][a-zA-Z0-9]+$'
