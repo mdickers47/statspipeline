@@ -1,4 +1,5 @@
 #!/usr/bin/python2.5
+"""Commandline and environment flag parsing"""
 
 import getopt
 import os
@@ -13,6 +14,14 @@ _USAGE = []
 
 
 def DefineInteger(name, default_value, description, required=False):
+  """Define a flag that takes an integer value
+
+  Args:
+    name: Flag name; command line use is --<name>
+    default_value: Value if not specified
+    description: Flag description shown in help text
+    required: If true, it is an error if this flag isn't specified
+  """
   FLAGS[name] = int(default_value)
   _CAST[name] = int
   _LONG_OPTIONS.append('%s=' % name)
@@ -22,6 +31,11 @@ def DefineInteger(name, default_value, description, required=False):
 
 
 def DefineString(name, default_value, description, required=False):
+  """Define a flag that takes a string value
+  
+  Args:
+    See DefineInteger()
+  """
   FLAGS[name] = str(default_value)
   _CAST[name] = str
   _LONG_OPTIONS.append('%s=' % name)
@@ -31,6 +45,11 @@ def DefineString(name, default_value, description, required=False):
 
 
 def DefineFloat(name, default_value, description, required=False):
+  """Define a flag that takes a floating-point value
+
+  Args:
+    See DefineInteger()
+  """
   FLAGS[name] = float(default_value)
   _CAST[name] = float
   _LONG_OPTIONS.append('%s=' % name)
@@ -40,6 +59,11 @@ def DefineFloat(name, default_value, description, required=False):
 
 
 def DefineBoolean(name, default_value, description, required=False):
+  """Define a flag that is enabled or disabled by name
+
+  Args:
+    See DefineInteger()
+  """
   FLAGS[name] = bool(default_value)
   _CAST[name] = bool
   _LONG_OPTIONS.append(name)
@@ -50,6 +74,7 @@ def DefineBoolean(name, default_value, description, required=False):
 
 
 def ParseFlags():
+  """Parse environment and commandline flags into FLAGS"""
   env = os.environ
   for option in _LONG_OPTIONS:
     if option.endswith('='):
@@ -86,6 +111,11 @@ def ParseFlags():
 
 
 def Usage(exitcode=1):
+  """Print usage information generated from defined flags
+
+  Args:
+    exitcode: If nonzero, exit with this return value after printing usage
+  """
   print 'Usage: %s [options]' % sys.argv[0]
   print
   print '\n'.join(['  %s' % x for x in _USAGE])
