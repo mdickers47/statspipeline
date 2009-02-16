@@ -1,1 +1,1 @@
---indent-string='  ' --max-line-length=100000 --function-rgx='[A-Z_][a-zA-Z0-9]+$' --reports=n --output-format=colorized
+--indent-string='  ' --max-line-length=100000 --function-rgx='[A-Z_][a-zA-Z0-9]+$' --method-rgx='([A-Z_][a-zA-Z0-9]+|__[a-z]+__)$' --reports=n --output-format=colorized

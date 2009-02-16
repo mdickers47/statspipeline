@@ -10,4 +10,4 @@ class IdentityBlock(pipelineblock.PipelineBlock):
 
 
 if __name__ == '__main__':
-  pipelineblock.main(IdentityBlock)
+  pipelineblock.Main(IdentityBlock)
