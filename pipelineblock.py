@@ -1,4 +1,5 @@
 #!/usr/bin/python2.5
+"""Base classes for building stats pipeline blocks."""
 
 import cPickle
 import gc
@@ -53,13 +54,19 @@ class VirtualTable(object):
       ret += '============================================\n'
     return ret
 
-  def fields(self):
+  def Fields(self):
+    """Get field name list."""
     return self._fields
 
-  def rows(self):
+  def Rows(self):
+    """Get rows.
+
+    Returns:
+      A list of lists of cell contents
+    """
     return self._rows
 
-  def append(self, row):
+  def Append(self, row):
     """Append a new row
 
     Args:
@@ -69,6 +76,7 @@ class VirtualTable(object):
 
 
 class PipelineBlock(pyinotify.ProcessEvent):
+  """A data processing block that can be added to the pipeline; loads input from a file, does processing, then writes it out."""
   _dbh = None
   _stop = False
 
@@ -83,14 +91,15 @@ class PipelineBlock(pyinotify.ProcessEvent):
     self._input_dir = os.path.join(basedir, '%s-input' % self._instance)
     self._output_dir = os.path.join(basedir, '%s-output' % self._instance)
     self._completed_dir = os.path.join(basedir, '%s-completed' % self._instance)
-    self._makedirs(self._input_dir)
-    self._makedirs(self._output_dir)
-    self._makedirs(self._completed_dir)
+    self._MakeDirs(self._input_dir)
+    self._MakeDirs(self._output_dir)
+    self._MakeDirs(self._completed_dir)
 
-  def _makedirs(self, dir):
+  def _MakeDirs(self, dir_name):
+    """Make a directory tree, ignoring errors."""
     try:
-      os.makedirs(dir, 0755)
-    except:
+      os.makedirs(dir_name, 0755)
+    except OSError:
       pass
 
   def process_IN_MOVED_TO(self, event):
@@ -102,17 +111,30 @@ class PipelineBlock(pyinotify.ProcessEvent):
     self.ProcessFile(event.name)
 
   def StartTimer(self):
+    """Start timing a process; see StopTimer()."""
     self._start_time = time.time()
 
   def StopTimer(self):
+    """Stop timing; see StartTimer().
+
+    Returns:
+      Time taken, in seconds (with a partial component)
+    """
     return time.time() - self._start_time
 
-  def Log(self, msg, unused_priority=0):
+  def Log(self, msg):
+    """Log a message via all available logging methods."""
     self.DBExecute("INSERT INTO Log (class, instance, event) VALUES (%s, %s, %s)",
                    self.__class__.__name__, self._instance, msg)
     print '%s/%s: %s' % (self.__class__.__name__, self._instance, msg)
 
   def WriteData(self, name, data):
+    """Write pre-serialized data to the output file.
+
+    Args:
+      name: The destination filename
+      data: The serialized block of data
+    """
     tempname = os.path.join(self._output_dir, '_%s' % name)
     handle = open(tempname, 'w')
     self.WriteFile(handle, data)
@@ -121,6 +143,11 @@ class PipelineBlock(pyinotify.ProcessEvent):
               os.path.join(self._output_dir, name))
 
   def ProcessFile(self, name):
+    """Process a single file: load it, run data processing, and write it back out.
+    
+    Args:
+      name: The filename that the source file is named in self._input_dir, and should be named in self._completed_dir nad self._output_dir
+    """
     if name.startswith('_') or name.endswith('.tmp'):
       # Temporary file
       return
@@ -170,10 +197,10 @@ class PipelineBlock(pyinotify.ProcessEvent):
     self.Log('Starting')
 
     signal.signal(signal.SIGTERM, self.Stop)
-    wm = pyinotify.WatchManager()
+    watch_manager = pyinotify.WatchManager()
     mask = pyinotify.EventsCodes.IN_CREATE | pyinotify.EventsCodes.IN_MOVED_TO
-    notifier = pyinotify.Notifier(wm, self)
-    wm.add_watch(self._input_dir, mask, rec=True)
+    notifier = pyinotify.Notifier(watch_manager, self)
+    watch_manager.add_watch(self._input_dir, mask, rec=True)
     while True:
       if self._stop:
         self.Log('Stopped.')
@@ -224,12 +251,13 @@ class PipelineBlock(pyinotify.ProcessEvent):
     cPickle.dump(data, handle, cPickle.HIGHEST_PROTOCOL)
 
   def DBDisconnect(self):
+    """Disconnect from the database."""
     if self._dbh:
       self._dbh.close()
       self._dbh = None
 
   def DBExecute(self, query, *args):
-    """Execute a query on the database, creating a connection if necessary
+    """Execute a query on the database, creating a connection if necessary.
 
     Args:
       query: SQL string
@@ -237,12 +265,6 @@ class PipelineBlock(pyinotify.ProcessEvent):
       Full query result in virtual table
     """
     if not self._dbh:
-      db_args = {
-        'host': FLAGS['db-hostname'],
-        'user': FLAGS['db-username'],
-        'password': FLAGS['db-password'],
-        'db': FLAGS['db-name'],
-      }
       if FLAGS['db-type'] == 'mysql':
         self._dbh = MySQLdb.connect(host=FLAGS['db-hostname'],
                                     user=FLAGS['db-username'],
@@ -261,7 +283,7 @@ class PipelineBlock(pyinotify.ProcessEvent):
     self._dbh.commit()
     try:
       result = self._cursor.fetchall()
-    except:
+    except MySQLdb.Error:
       return None
     if not result:
       return result
@@ -269,7 +291,8 @@ class PipelineBlock(pyinotify.ProcessEvent):
     return VirtualTable(fields, result)
 
 
-def main(block_class, *args, **kwargs):
+def Main(block_class, *args, **kwargs):
+  """Main program function, called from each pipeline block implementation."""
   flags.ParseFlags()
 
   block = block_class(FLAGS['basedir'], FLAGS['instance'], *args, **kwargs)
