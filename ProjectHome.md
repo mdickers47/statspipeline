@@ -1,0 +1,1 @@
+A base API, execution environment and a series of "blocks" that can be assembled to form a fast, real-time processing pipeline for statistics.
